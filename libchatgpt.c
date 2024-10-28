@@ -224,6 +224,11 @@ chatgpt_create_assistant_cb(ChatGptAccount *cga, JsonObject *obj, gpointer user_
 	const gchar *id = json_object_get_string_member(obj, "id");
 	const gchar *name = json_object_get_string_member(obj, "name");
 
+	if (id == NULL || id[0] == 0) {
+		purple_debug_error("chatgpt", "Error creating assistant\n");
+		return;
+	}
+
 	// add to the buddy list
 	if (!purple_find_buddy(cga->account, id)) {
 		purple_blist_add_buddy(purple_buddy_new(cga->account, id, name), NULL, NULL, NULL);
@@ -256,13 +261,8 @@ chatgpt_create_assistant(ChatGptAccount *cga, const gchar *instructions)
 {
 	JsonObject *obj = json_object_new();
 
-	//JsonObject *response_format = json_object_new();
-	//json_object_set_string_member(response_format, "type", "json_object");
-
-	// TODO add more model options
-	json_object_set_string_member(obj, "model", "gpt-4o-mini");
+	json_object_set_string_member(obj, "model", purple_account_get_string(cga->account, "default_model", "gpt-4o-mini"));
 	json_object_set_string_member(obj, "instructions", instructions);
-	//json_object_set_object_member(obj, "response_format", response_format);
 	
 	chatgpt_http_request(cga, "/v1/assistants", obj, chatgpt_create_assistant_cb, cga);
 	json_object_unref(obj);
@@ -353,13 +353,9 @@ chatgpt_send_message(ChatGptAccount *cga, const gchar *id, const gchar *message)
 	url = g_strdup_printf("/v1/threads/%s/runs", thread_id);
 	obj = json_object_new();
 
-	//JsonObject *response_format = json_object_new();
-	//json_object_set_string_member(response_format, "type", "json_object");
-
 	json_object_set_string_member(obj, "assistant_id", id);
-	//json_object_set_object_member(obj, "response_format", response_format);
-	//json_object_set_string_member(obj, "additional_instructions", "Please respond in JSON format");
-	//TODO
+
+	//TODO - use purple_http_request_set_response_writer to parse server-sent event stream
 	//json_object_set_bool_member(obj, "stream", TRUE);
 
 	chatgpt_http_request(cga, url, obj, chatgpt_send_run_cb, g_strdup(id));
@@ -595,6 +591,29 @@ chatgpt_offline_message(const PurpleBuddy *buddy)
 	return TRUE;
 }
 
+static PurpleCmdRet
+chatgpt_cmd_model(PurpleConversation *conv, const gchar *cmd, gchar **args, gchar **error, void *data)
+{
+	// update the model for the assistant
+	const gchar *name = purple_conversation_get_name(conv);
+	if (name == NULL || name[0] == 0 || purple_strequal(name, CHATGPT_INSTRUCTOR_ID)) {
+		return PURPLE_CMD_RET_FAILED;
+	}
+
+	ChatGptAccount *cga = purple_connection_get_protocol_data(purple_conversation_get_connection(conv));
+	gchar *url = g_strdup_printf("/v1/assistants/%s", name);
+
+	JsonObject *obj = json_object_new();
+	json_object_set_string_member(obj, "model", args[0]);
+
+	chatgpt_http_request(cga, url, obj, NULL, NULL);
+
+	json_object_unref(obj);
+	g_free(url);
+	
+	return PURPLE_CMD_RET_OK;
+}
+
 /******************************************************************************/
 /* Plugin functions */
 /******************************************************************************/
@@ -640,6 +659,11 @@ plugin_load(PurplePlugin *plugin
 	_purple_socket_init();
 	purple_http_init();
 #endif
+
+	purple_cmd_register("model", "s", PURPLE_CMD_P_PLUGIN, PURPLE_CMD_FLAG_IM |
+						PURPLE_CMD_FLAG_PROTOCOL_ONLY,
+						CHATGPT_PLUGIN_ID, chatgpt_cmd_model,
+						_("model &lt;model&gt;:  Change the model of the assistant"), NULL);
 	
 	return TRUE;
 }
@@ -718,17 +742,37 @@ chatgpt_protocol_init(PurpleProtocol *prpl_info)
 	prpl_info->options = OPT_PROTO_NO_PASSWORD | OPT_PROTO_IM_IMAGE;
 
 #if !PURPLE_VERSION_CHECK(3, 0, 0)
-#	define chatgpt_PRPL_APPEND_ACCOUNT_OPTION(opt) prpl_info->protocol_options = g_list_append(prpl_info->protocol_options, (opt));
+#	define PRPL_APPEND_ACCOUNT_OPTION(opt) prpl_info->protocol_options = g_list_append(prpl_info->protocol_options, (opt));
 	prpl_info->icon_spec = icon_spec;
 #else
-#	define chatgpt_PRPL_APPEND_ACCOUNT_OPTION(opt) prpl_info->account_options = g_list_append(prpl_info->account_options, (opt));
+#	define PRPL_APPEND_ACCOUNT_OPTION(opt) prpl_info->account_options = g_list_append(prpl_info->account_options, (opt));
 	prpl_info->icon_spec = &icon_spec;
 #endif
 	
 	opt = purple_account_option_string_new(_("OpenAI API Token"), "openai_token", NULL);
-	chatgpt_PRPL_APPEND_ACCOUNT_OPTION(opt);
+	PRPL_APPEND_ACCOUNT_OPTION(opt);
 
-#undef chatgpt_PRPL_APPEND_ACCOUNT_OPTION
+	// list out the models to choose from by default
+	GList *models = NULL;
+	PurpleKeyValuePair *model;
+
+#define ADD_MODEL(name) \
+	model = g_new(PurpleKeyValuePair, 1); \
+	model->key = g_strdup(name); \
+	model->value = g_strdup(name); \
+	models = g_list_append(models, model);
+
+	ADD_MODEL("gpt-4o-mini");
+	ADD_MODEL("gpt-4o");
+	ADD_MODEL("gpt-4");
+	ADD_MODEL("gpt-3.5-turbo");
+	ADD_MODEL("gpt-4-turbo");
+
+	opt = purple_account_option_list_new(_("Default Model"), "default_model", models);
+	PRPL_APPEND_ACCOUNT_OPTION(opt);
+#undef ADD_MODEL
+
+#undef PRPL_APPEND_ACCOUNT_OPTION
 	
 #if PURPLE_VERSION_CHECK(3, 0, 0)
 }
