@@ -187,9 +187,13 @@ chatgpt_create_icon_cb(ChatGptAccount *cga, JsonObject *obj, gpointer user_data)
 static void
 chatgpt_create_icon(ChatGptAccount *cga, const gchar *id, const gchar *instructions)
 {
+	if (!purple_account_get_bool(cga->account, "generate_icons", TRUE)) {
+		return;
+	}
+
 	JsonObject *obj = json_object_new();
 
-	gchar *prompt = g_strdup_printf("An avatar icon for a chatbot. The chatbot is instructed to %s", instructions);
+	gchar *prompt = g_strdup_printf("An avatar icon for: %s", instructions);
 
 	json_object_set_string_member(obj, "prompt", prompt);
 	json_object_set_string_member(obj, "size", "256x256");
@@ -750,6 +754,9 @@ chatgpt_protocol_init(PurpleProtocol *prpl_info)
 #endif
 	
 	opt = purple_account_option_string_new(_("OpenAI API Token"), "openai_token", NULL);
+	PRPL_APPEND_ACCOUNT_OPTION(opt);
+	
+	opt = purple_account_option_bool_new(_("Generate avatar icons (costs $0.02 each)"), "generate_icons", TRUE);
 	PRPL_APPEND_ACCOUNT_OPTION(opt);
 
 	// list out the models to choose from by default
