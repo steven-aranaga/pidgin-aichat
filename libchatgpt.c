@@ -22,6 +22,7 @@
 #include "glib.h"
 #include "purplecompat.h"
 #include <http.h>
+#include "markdown.h"
 
 /******************************************************************************/
 /* JSON functions */
@@ -285,10 +286,14 @@ chatgpt_send_message_cb(ChatGptAccount *cga, JsonObject *obj, gpointer user_data
 		return;
 	}
 
+	// convert markdown to html
+	gchar *html = markdown_convert_markdown(text_value, TRUE, FALSE);
+
 	// send the message to the user
-	purple_serv_got_im(cga->pc, assistant_id, text_value, PURPLE_MESSAGE_RECV, time(NULL));
+	purple_serv_got_im(cga->pc, assistant_id, html, PURPLE_MESSAGE_RECV, time(NULL));
 
 	g_free(assistant_id);
+	g_free(html);
 }
 
 static void
