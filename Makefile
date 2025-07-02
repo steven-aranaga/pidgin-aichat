@@ -73,7 +73,10 @@ WIN32_PIDGIN3_LDFLAGS = -L$(PIDGIN3_TREE_TOP)/libpurple -L$(WIN32_DEV_TOP)/gplug
 
 C_FILES = \
 	libchatgpt.c \
-	markdown.c
+	markdown.c \
+	providers.c \
+	provider_registry.c \
+	providers/openai.c
 PURPLE_COMPAT_FILES := purple2compat/http.c purple2compat/purple-socket.c
 PURPLE_C_FILES := libchatgpt.c $(C_FILES)
 

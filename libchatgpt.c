@@ -120,6 +120,59 @@ chatgpt_http_request_cb(PurpleHttpConnection *http_conn, PurpleHttpResponse *res
 	g_free(conn);
 }
 
+/* Provider-aware HTTP request function */
+static ChatGptApiConnection *
+chatgpt_provider_http_request(ChatGptAccount *cga, const gchar *full_url, const JsonObject *obj, ChatGptCallbackFunc callback, gpointer user_data)
+{
+	PurpleConnection *pc = cga->pc;
+	ChatGptApiConnection *conn;
+	PurpleHttpRequest *request;
+	LLMProvider *provider;
+	
+	provider = llm_provider_get(cga->provider_type);
+	
+	request = purple_http_request_new(full_url);
+	purple_http_request_set_keepalive_pool(request, cga->keepalive_pool);
+	if (obj != NULL) {
+		gsize len;
+		gchar *body = json_object_to_string(obj, &len);
+
+		purple_http_request_set_method(request, "POST");
+		purple_http_request_set_contents(request, body, len);
+		purple_http_request_header_set(request, "Content-Type", "application/json");
+	}
+	purple_http_request_set_max_redirects(request, 0);
+	purple_http_request_set_timeout(request, 120);
+	
+	/* Add provider-specific headers */
+	if (provider && provider->get_additional_headers) {
+		GHashTable *headers = provider->get_additional_headers(cga, NULL);
+		if (headers) {
+			GHashTableIter iter;
+			gpointer key, value;
+			g_hash_table_iter_init(&iter, headers);
+			while (g_hash_table_iter_next(&iter, &key, &value)) {
+				purple_http_request_header_set(request, (const char *)key, (const char *)value);
+			}
+			g_hash_table_destroy(headers);
+		}
+	}
+	
+	conn = g_new0(ChatGptApiConnection, 1);
+	conn->cga = cga;
+	conn->user_data = user_data;
+	conn->callback = callback;
+	
+	conn->http_conn = purple_http_request(pc, request, chatgpt_http_request_cb, conn);
+	if (conn->http_conn != NULL) {
+		purple_http_connection_set_add(cga->conns, conn->http_conn);
+	}
+	purple_http_request_unref(request);
+
+	return conn;
+}
+
+/* Legacy HTTP request function for OpenAI assistants API compatibility */
 static ChatGptApiConnection *
 chatgpt_http_request(ChatGptAccount *cga, const gchar *path, const JsonObject *obj, ChatGptCallbackFunc callback, gpointer user_data)
 {
@@ -128,8 +181,24 @@ chatgpt_http_request(ChatGptAccount *cga, const gchar *path, const JsonObject *o
 	ChatGptApiConnection *conn;
 	PurpleHttpRequest *request;
 	gchar *url;
-	const gchar *openai_token = purple_account_get_string(account, "openai_token", NULL);
-
+	const gchar *api_key;
+	LLMProvider *provider;
+	const gchar *provider_name;
+	
+	/* Get the provider for this account */
+	provider_name = purple_account_get_string(account, "provider", "openai");
+	cga->provider_type = llm_provider_get_type_from_name(provider_name);
+	provider = llm_provider_get(cga->provider_type);
+	
+	/* Fall back to OpenAI if provider not found */
+	if (provider == NULL) {
+		purple_debug_warning("chatgpt", "Provider '%s' not found, falling back to OpenAI\n", provider_name);
+		cga->provider_type = LLM_PROVIDER_OPENAI;
+		provider = llm_provider_get(LLM_PROVIDER_OPENAI);
+	}
+	
+	/* For now, still use hardcoded URL for compatibility */
+	/* This will be refactored to use provider URLs in the next step */
 	url = g_strdup_printf("https://%s%s", CHATGPT_API_HOST, path);
 	
 	request = purple_http_request_new(url);
@@ -144,8 +213,28 @@ chatgpt_http_request(ChatGptAccount *cga, const gchar *path, const JsonObject *o
 	}
 	purple_http_request_set_max_redirects(request, 0);
 	purple_http_request_set_timeout(request, 120);
-	purple_http_request_header_set(request, "OpenAI-Beta", "assistants=v2");
-	purple_http_request_header_set_printf(request, "Authorization", "Bearer %s", openai_token);
+	
+	/* Use provider-specific headers */
+	if (provider && provider->get_auth_header) {
+		const gchar *auth_header = provider->get_auth_header(cga);
+		if (auth_header) {
+			purple_http_request_header_set(request, "Authorization", auth_header);
+		}
+	} else {
+		/* Fallback for backward compatibility */
+		api_key = purple_account_get_string(account, "api_key", NULL);
+		if (!api_key || !*api_key) {
+			api_key = purple_account_get_string(account, "openai_token", NULL);
+		}
+		if (api_key && *api_key) {
+			purple_http_request_header_set_printf(request, "Authorization", "Bearer %s", api_key);
+		}
+	}
+	
+	/* OpenAI-specific header for assistants API */
+	if (cga->provider_type == LLM_PROVIDER_OPENAI) {
+		purple_http_request_header_set(request, "OpenAI-Beta", "assistants=v2");
+	}
 	
 	conn = g_new0(ChatGptApiConnection, 1);
 	conn->cga = cga;
@@ -368,6 +457,189 @@ chatgpt_send_message(ChatGptAccount *cga, const gchar *id, const gchar *message)
 	g_free(url);
 }
 
+/* Generic chat completion callback for provider-based chat */
+static void
+chatgpt_chat_completion_cb(ChatGptAccount *cga, JsonObject *obj, gpointer user_data)
+{
+	gchar *buddy_id = user_data;
+	LLMProvider *provider;
+	gchar *response_text = NULL;
+	GError *error = NULL;
+	
+	provider = llm_provider_get(cga->provider_type);
+	if (provider == NULL) {
+		purple_debug_error("chatgpt", "No provider found for type %d\n", cga->provider_type);
+		g_free(buddy_id);
+		return;
+	}
+	
+	/* Validate response */
+	if (provider->validate_response && !provider->validate_response(obj, &error)) {
+		purple_debug_error("chatgpt", "Invalid response: %s\n", error ? error->message : "Unknown error");
+		if (error) {
+			purple_serv_got_im(cga->pc, buddy_id, error->message, PURPLE_MESSAGE_ERROR | PURPLE_MESSAGE_RECV, time(NULL));
+			g_error_free(error);
+		}
+		g_free(buddy_id);
+		return;
+	}
+	
+	/* Parse response */
+	if (provider->parse_response) {
+		response_text = provider->parse_response(obj, &error);
+		if (response_text == NULL) {
+			purple_debug_error("chatgpt", "Failed to parse response: %s\n", error ? error->message : "Unknown error");
+			if (error) {
+				purple_serv_got_im(cga->pc, buddy_id, error->message, PURPLE_MESSAGE_ERROR | PURPLE_MESSAGE_RECV, time(NULL));
+				g_error_free(error);
+			}
+			g_free(buddy_id);
+			return;
+		}
+	}
+	
+	/* Convert markdown to HTML */
+	gchar *html = markdown_convert_markdown(response_text, TRUE, FALSE);
+	
+	/* Send the message to the user */
+	purple_serv_got_im(cga->pc, buddy_id, html, PURPLE_MESSAGE_RECV, time(NULL));
+	
+	/* Add to buddy history */
+	PurpleBuddy *buddy = purple_find_buddy(cga->account, buddy_id);
+	if (buddy) {
+		ChatGptBuddy *cgb = purple_buddy_get_protocol_data(buddy);
+		if (cgb) {
+			ChatGptHistory *hist = g_new0(ChatGptHistory, 1);
+			hist->role = g_strdup("assistant");
+			hist->content = g_strdup(response_text);
+			cgb->history = g_list_append(cgb->history, hist);
+		}
+	}
+	
+	g_free(response_text);
+	g_free(html);
+	g_free(buddy_id);
+}
+
+/* Create a simple bot for non-OpenAI providers */
+static void
+chatgpt_create_simple_bot(ChatGptAccount *cga, const gchar *instructions)
+{
+	/* Generate a simple ID based on timestamp */
+	gchar *bot_id = g_strdup_printf("bot_%ld", time(NULL));
+	gchar *bot_name = g_strdup("AI Assistant");
+	
+	/* Extract name from instructions if provided in format "Name: xxx" */
+	if (instructions && g_str_has_prefix(instructions, "Name: ")) {
+		const gchar *name_start = instructions + 6;
+		const gchar *name_end = strchr(name_start, '\n');
+		if (name_end) {
+			g_free(bot_name);
+			bot_name = g_strndup(name_start, name_end - name_start);
+			instructions = name_end + 1;
+		} else {
+			g_free(bot_name);
+			bot_name = g_strdup(name_start);
+			instructions = "";
+		}
+	}
+	
+	/* Add to buddy list */
+	if (!purple_find_buddy(cga->account, bot_id)) {
+		purple_blist_add_buddy(purple_buddy_new(cga->account, bot_id, bot_name), NULL, NULL, NULL);
+	}
+	
+	PurpleBuddy *buddy = purple_find_buddy(cga->account, bot_id);
+	ChatGptBuddy *cbuddy = g_new0(ChatGptBuddy, 1);
+	purple_buddy_set_protocol_data(buddy, cbuddy);
+	
+	cbuddy->buddy = buddy;
+	cbuddy->instructions = g_strdup(instructions);
+	cbuddy->name = g_strdup(bot_name);
+	cbuddy->description = g_strdup_printf("AI Assistant using %s", llm_provider_get_display_name(cga->provider_type));
+	cbuddy->model = g_strdup(purple_account_get_string(cga->account, "default_model", ""));
+	cbuddy->history = NULL;
+	cbuddy->provider = llm_provider_get(cga->provider_type);
+	
+	/* Mark as online */
+	purple_prpl_got_user_status(cga->account, bot_id, "available", NULL);
+	
+	/* Notify user */
+	purple_conversation_write(purple_find_conversation_with_account(PURPLE_CONV_TYPE_IM, CHATGPT_INSTRUCTOR_ID, cga->account),
+		CHATGPT_INSTRUCTOR_ID,
+		g_strdup_printf("Created bot '%s' with ID: %s", bot_name, bot_id),
+		PURPLE_MESSAGE_SYSTEM | PURPLE_MESSAGE_NO_LOG,
+		time(NULL));
+	
+	g_free(bot_id);
+	g_free(bot_name);
+}
+
+/* Generic function to send chat message using provider interface */
+static void
+chatgpt_send_chat_message(ChatGptAccount *cga, const gchar *buddy_id, const gchar *message)
+{
+	PurpleBuddy *buddy;
+	ChatGptBuddy *cgb;
+	LLMProvider *provider;
+	JsonObject *request;
+	gchar *url;
+	
+	buddy = purple_find_buddy(cga->account, buddy_id);
+	if (buddy == NULL) {
+		purple_debug_error("chatgpt", "Buddy not found: %s\n", buddy_id);
+		return;
+	}
+	
+	cgb = purple_buddy_get_protocol_data(buddy);
+	if (cgb == NULL) {
+		purple_debug_error("chatgpt", "No protocol data for buddy: %s\n", buddy_id);
+		return;
+	}
+	
+	provider = llm_provider_get(cga->provider_type);
+	if (provider == NULL) {
+		purple_debug_error("chatgpt", "No provider found for type %d\n", cga->provider_type);
+		return;
+	}
+	
+	/* Add message to history */
+	ChatGptHistory *hist = g_new0(ChatGptHistory, 1);
+	hist->role = g_strdup("user");
+	hist->content = g_strdup(message);
+	cgb->history = g_list_append(cgb->history, hist);
+	
+	/* Set provider for buddy if not set */
+	if (cgb->provider == NULL) {
+		cgb->provider = provider;
+	}
+	
+	/* Format request using provider interface */
+	if (provider->format_request) {
+		request = provider->format_request(cgb, message);
+		if (request == NULL) {
+			purple_debug_error("chatgpt", "Failed to format request\n");
+			return;
+		}
+	} else {
+		purple_debug_error("chatgpt", "Provider has no format_request function\n");
+		return;
+	}
+	
+	/* Get chat URL */
+	if (provider->get_chat_url) {
+		url = provider->get_chat_url(provider, cgb);
+	} else {
+		url = g_strdup_printf("%s%s", provider->endpoint_url, provider->chat_endpoint);
+	}
+	
+	/* Send request using provider-aware HTTP function */
+	chatgpt_provider_http_request(cga, url, request, chatgpt_chat_completion_cb, g_strdup(buddy_id));
+	
+	json_object_unref(request);
+	g_free(url);
+}
+
 static void
 chatgpt_fetch_assistants_cb(ChatGptAccount *cga, JsonObject *obj, gpointer user_data)
 {
@@ -457,6 +729,19 @@ chatgpt_buddy_free(PurpleBuddy *buddy)
 		g_free(cbuddy->name);
 		g_free(cbuddy->description);
 		g_free(cbuddy->model);
+		
+		/* Free history list */
+		if (cbuddy->history) {
+			GList *l;
+			for (l = cbuddy->history; l; l = l->next) {
+				ChatGptHistory *hist = l->data;
+				g_free(hist->role);
+				g_free(hist->content);
+				g_free(hist);
+			}
+			g_list_free(cbuddy->history);
+		}
+		
 		g_free(cbuddy);
 	}
 }
@@ -480,11 +765,24 @@ gint
 chatgpt_send_im(PurpleConnection *gc, const char *who, const char *message, PurpleMessageFlags flags)
 {
 	ChatGptAccount *cga = purple_connection_get_protocol_data(gc);
-	if (purple_strequal(who, CHATGPT_INSTRUCTOR_ID)) {
-		// Treat this as creating a new assistant
-		chatgpt_create_assistant(cga, message);	
+	
+	/* Check if we're using OpenAI's assistants API or generic chat */
+	if (cga->provider_type == LLM_PROVIDER_OPENAI) {
+		/* Use OpenAI's assistants API */
+		if (purple_strequal(who, CHATGPT_INSTRUCTOR_ID)) {
+			// Treat this as creating a new assistant
+			chatgpt_create_assistant(cga, message);	
+		} else {
+			chatgpt_send_message(cga, who, message);
+		}
 	} else {
-		chatgpt_send_message(cga, who, message);
+		/* Use generic chat completion API */
+		if (purple_strequal(who, CHATGPT_INSTRUCTOR_ID)) {
+			/* For non-OpenAI providers, create a simple bot */
+			chatgpt_create_simple_bot(cga, message);
+		} else {
+			chatgpt_send_chat_message(cga, who, message);
+		}
 	}
 	
 	return 1;
@@ -523,6 +821,7 @@ chatgpt_login(PurpleAccount *account)
 	PurpleConnection *pc = purple_account_get_connection(account);
 	ChatGptAccount *cga = g_new0(ChatGptAccount, 1);
 	PurpleConnectionFlags flags;
+	const gchar *provider_name;
 	
 	purple_connection_set_protocol_data(pc, cga);
 
@@ -535,6 +834,14 @@ chatgpt_login(PurpleAccount *account)
 	cga->keepalive_pool = purple_http_keepalive_pool_new();
 	cga->conns = purple_http_connection_set_new();
 	
+	/* Initialize provider type */
+	provider_name = purple_account_get_string(account, "provider", "openai");
+	cga->provider_type = llm_provider_get_type_from_name(provider_name);
+	if (cga->provider_type >= LLM_PROVIDER_COUNT) {
+		purple_debug_warning("chatgpt", "Invalid provider '%s', defaulting to OpenAI\n", provider_name);
+		cga->provider_type = LLM_PROVIDER_OPENAI;
+	}
+	
 	purple_connection_update_progress(pc, "", 1, 1);
 #if !PURPLE_VERSION_CHECK(3, 0, 0)
 	purple_connection_set_state(pc, PURPLE_CONNECTION_CONNECTED);
@@ -545,15 +852,46 @@ chatgpt_login(PurpleAccount *account)
 		purple_blist_add_buddy(purple_buddy_new(account, CHATGPT_INSTRUCTOR_ID, NULL), NULL, NULL, NULL);
 	}
 
-	const gchar *openai_token = purple_account_get_string(account, "openai_token", NULL);
-	if (openai_token == NULL || openai_token[0] == 0) {
-		purple_notify_message(pc, PURPLE_NOTIFY_MSG_ERROR, "ChatGPT", "You need to set your OpenAI API key in the account settings. Get it from " CHATGPT_API_KEY_URL, NULL, NULL, NULL);
-		purple_notify_uri(pc, CHATGPT_API_KEY_URL);
+	/* Check for API key */
+	const gchar *api_key = purple_account_get_string(account, "api_key", NULL);
+	if (!api_key || !*api_key) {
+		/* Check old OpenAI token field for backward compatibility */
+		api_key = purple_account_get_string(account, "openai_token", NULL);
+	}
+	
+	if (api_key == NULL || api_key[0] == 0) {
+		LLMProvider *provider = llm_provider_get(cga->provider_type);
+		const gchar *provider_name = provider ? provider->display_name : "AI Provider";
+		gchar *error_msg = g_strdup_printf("You need to set your %s API key in the account settings.", provider_name);
+		purple_notify_message(pc, PURPLE_NOTIFY_MSG_ERROR, "AI Chat", error_msg, NULL, NULL, NULL);
+		g_free(error_msg);
+		
+		if (cga->provider_type == LLM_PROVIDER_OPENAI) {
+			purple_notify_uri(pc, CHATGPT_API_KEY_URL);
+		}
 	} else {
 		purple_prpl_got_user_status(account, CHATGPT_INSTRUCTOR_ID, "available", NULL);
-		purple_serv_got_im(pc, CHATGPT_INSTRUCTOR_ID, "Hello! I'm the ChatGPT plugin for Pidgin. To create a new assistant, send a message to me with the instructions for the assistant you want to create.", PURPLE_MESSAGE_SYSTEM | PURPLE_MESSAGE_RECV, time(NULL));
-
-		chatgpt_fetch_assistants(cga);
+		
+		if (cga->provider_type == LLM_PROVIDER_OPENAI) {
+			purple_serv_got_im(pc, CHATGPT_INSTRUCTOR_ID, 
+				"Hello! I'm the ChatGPT plugin for Pidgin. To create a new assistant, send a message to me with the instructions for the assistant you want to create.", 
+				PURPLE_MESSAGE_SYSTEM | PURPLE_MESSAGE_RECV, time(NULL));
+			chatgpt_fetch_assistants(cga);
+		} else {
+			LLMProvider *provider = llm_provider_get(cga->provider_type);
+			const gchar *provider_name = provider ? provider->display_name : "AI";
+			gchar *welcome_msg = g_strdup_printf(
+				"Hello! I'm the %s chat plugin for Pidgin. To create a new bot, send me a message with:\n"
+				"Name: Bot Name\n"
+				"Instructions for the bot (optional)",
+				provider_name);
+			purple_serv_got_im(pc, CHATGPT_INSTRUCTOR_ID, welcome_msg, 
+				PURPLE_MESSAGE_SYSTEM | PURPLE_MESSAGE_RECV, time(NULL));
+			g_free(welcome_msg);
+			
+			/* For non-OpenAI providers, we don't fetch assistants */
+			/* Users will create bots manually */
+		}
 	}
 }
 
@@ -664,6 +1002,9 @@ plugin_load(PurplePlugin *plugin
 	purple_http_init();
 #endif
 
+	/* Initialize the provider system */
+	llm_providers_init();
+
 	purple_cmd_register("model", "s", PURPLE_CMD_P_PLUGIN, PURPLE_CMD_FLAG_IM |
 						PURPLE_CMD_FLAG_PROTOCOL_ONLY,
 						CHATGPT_PLUGIN_ID, chatgpt_cmd_model,
@@ -684,6 +1025,9 @@ plugin_unload(PurplePlugin *plugin
 	purple_http_uninit();
 #endif
 	purple_signals_disconnect_by_handle(plugin);
+	
+	/* Cleanup the provider system */
+	llm_providers_uninit();
 	
 	return TRUE;
 }
@@ -753,7 +1097,34 @@ chatgpt_protocol_init(PurpleProtocol *prpl_info)
 	prpl_info->icon_spec = &icon_spec;
 #endif
 	
-	opt = purple_account_option_string_new(_("OpenAI API Token"), "openai_token", NULL);
+	/* Provider selection dropdown */
+	GList *providers = NULL;
+	PurpleKeyValuePair *provider;
+	int i;
+	
+#define ADD_PROVIDER(type, name) \
+	provider = g_new(PurpleKeyValuePair, 1); \
+	provider->key = g_strdup(name); \
+	provider->value = g_strdup(provider_type_names[type]); \
+	providers = g_list_append(providers, provider);
+	
+	/* Add available providers */
+	for (i = 0; i < LLM_PROVIDER_COUNT; i++) {
+		if (llm_provider_is_available(i)) {
+			ADD_PROVIDER(i, llm_provider_get_display_name(i));
+		}
+	}
+	
+	/* If no providers available, add at least OpenAI */
+	if (providers == NULL) {
+		ADD_PROVIDER(LLM_PROVIDER_OPENAI, "OpenAI");
+	}
+	
+	opt = purple_account_option_list_new(_("AI Provider"), "provider", providers);
+	PRPL_APPEND_ACCOUNT_OPTION(opt);
+#undef ADD_PROVIDER
+	
+	opt = purple_account_option_string_new(_("API Key"), "api_key", NULL);
 	PRPL_APPEND_ACCOUNT_OPTION(opt);
 	
 	opt = purple_account_option_bool_new(_("Generate avatar icons (costs $0.02 each)"), "generate_icons", TRUE);

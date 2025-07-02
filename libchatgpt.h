@@ -104,6 +104,9 @@
 #include "util.h"
 #include "version.h"
 
+/* Include providers header */
+#include "providers.h"
+
 	
 #if GLIB_MAJOR_VERSION >= 2 && GLIB_MINOR_VERSION >= 12
 #	define atoll(a) g_ascii_strtoll(a, NULL, 0)
@@ -116,12 +119,19 @@
 #define CHATGPT_INSTRUCTOR_ID "OpenAI Agent"
 #define CHATGPT_API_KEY_URL "https://platform.openai.com/settings/organization/general"
 
+typedef struct _ChatGptHistory ChatGptHistory;
+struct _ChatGptHistory {
+	gchar *role;
+	gchar *content;
+};
+
 typedef struct _ChatGptAccount ChatGptAccount;
 struct _ChatGptAccount {
 	PurpleAccount *account;
 	PurpleConnection *pc;
 	PurpleHttpKeepalivePool *keepalive_pool;
 	PurpleHttpConnectionSet *conns;
+	LLMProviderType provider_type;
 };
 
 typedef struct _ChatGptBuddy ChatGptBuddy;
@@ -132,6 +142,8 @@ struct _ChatGptBuddy {
 	gchar *name;
 	gchar *description;
 	gchar *model;
+	GList *history;  /* List of ChatGptHistory */
+	LLMProvider *provider;
 };
 
 
