@@ -89,8 +89,8 @@ sudo pacman -S base-devel libpurple json-glib glib2 zlib pidgin pkg-config
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/steven-aranaga/pidgin-aichat-clone.git
-cd pidgin-aichat-clone
+git clone https://github.com/steven-aranaga/pidgin-aichat.git
+cd pidgin-aichat
 ```
 
 2. **Build the plugin:**

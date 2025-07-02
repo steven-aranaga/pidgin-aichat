@@ -182,7 +182,7 @@ openrouter_get_additional_headers(ChatGptAccount *account, ChatGptBuddy *buddy)
     g_hash_table_insert(headers, g_strdup("Authorization"), auth_header);
     
     /* OpenRouter-specific headers */
-    g_hash_table_insert(headers, g_strdup("HTTP-Referer"), g_strdup("https://github.com/steven-aranaga/pidgin-aichat-clone"));
+    g_hash_table_insert(headers, g_strdup("HTTP-Referer"), g_strdup("https://github.com/steven-aranaga/pidgin-aichat"));
     g_hash_table_insert(headers, g_strdup("X-Title"), g_strdup("Pidgin AI Chat"));
     
     return headers;
@@ -262,4 +262,3 @@ llm_provider_openrouter_init(void)
 {
     llm_provider_registry_register(&openrouter_provider);
 }
-
