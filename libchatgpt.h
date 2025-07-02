@@ -112,7 +112,7 @@
 #	define atoll(a) g_ascii_strtoll(a, NULL, 0)
 #endif
 
-#define CHATGPT_PLUGIN_ID "prpl-eionrobb-chatgpt"
+#define CHATGPT_PLUGIN_ID "prpl-aranaga-aichat"
 #define CHATGPT_PLUGIN_VERSION "1.0"
 
 #define CHATGPT_API_HOST "api.openai.com"

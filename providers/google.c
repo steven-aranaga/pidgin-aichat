@@ -193,7 +193,8 @@ google_validate_response(JsonObject *response, GError **error)
         
         if (error) {
             *error = g_error_new(G_IO_ERROR, G_IO_ERROR_FAILED,
-                                "Google API Error (%ld): %s", 
+                                "Google API Error (%" G_GINT64_FORMAT "): %s", 
+
                                 error_code,
                                 error_msg ? error_msg : "Unknown error");
         }
@@ -243,9 +244,9 @@ google_parse_error(JsonObject *response)
     error_code = json_object_get_int_member(error_obj, "code");
     
     if (error_msg) {
-        return g_strdup_printf("Error %ld: %s", error_code, error_msg);
+        return g_strdup_printf("Error %" G_GINT64_FORMAT ": %s", error_code, error_msg);
     } else {
-        return g_strdup_printf("Error %ld: Unknown error", error_code);
+        return g_strdup_printf("Error %" G_GINT64_FORMAT ": Unknown error", error_code);
     }
 }
 

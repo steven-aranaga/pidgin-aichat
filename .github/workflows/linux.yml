@@ -17,10 +17,7 @@ jobs:
       - name: install deps
         run: |
           sudo apt update
-          sudo apt install -y libglib2.0-dev libjson-glib-dev gettext
-          # We only need these to build, not to run.  Skip the dependency check.
-          sudo apt download libpurple0 libpurple-dev
-          sudo dpkg --force-depends -i libpurple0*.deb libpurple-dev*.deb
+          sudo apt install -y libglib2.0-dev libjson-glib-dev gettext libpurple-dev libpurple0
       - name: make
         run: make
 
@@ -42,7 +39,7 @@ jobs:
           makeLatest: true
 
       - name: attest
-        if: ${{ !env.ACT }}
+        if: ${{ !env.ACT && github.repository_visibility == 'public' }}
         uses: actions/attest-build-provenance@v1
         with:
           subject-path: lib*.so

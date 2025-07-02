@@ -17,13 +17,15 @@ jobs:
       - name: install deps
         run: |
           # Add arm64 sources
-          sudo echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy main restricted" >> /etc/apt/sources.list.d/arm.list
-          sudo echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy-updates main restricted" >> /etc/apt/sources.list.d/arm.list
-          sudo echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy universe" >> /etc/apt/sources.list.d/arm.list
-          sudo echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy-updates universe" >> /etc/apt/sources.list.d/arm.list
-          sudo echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy multiverse" >> /etc/apt/sources.list.d/arm.list
-          sudo echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy-updates multiverse" >> /etc/apt/sources.list.d/arm.list
-          sudo echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy-backports main restricted universe multiverse" >> /etc/apt/sources.list.d/arm.list
+          sudo tee /etc/apt/sources.list.d/arm.list > /dev/null <<EOF
+          deb [arch=arm64] http://ports.ubuntu.com/ jammy main restricted
+          deb [arch=arm64] http://ports.ubuntu.com/ jammy-updates main restricted
+          deb [arch=arm64] http://ports.ubuntu.com/ jammy universe
+          deb [arch=arm64] http://ports.ubuntu.com/ jammy-updates universe
+          deb [arch=arm64] http://ports.ubuntu.com/ jammy multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ jammy-updates multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ jammy-backports main restricted universe multiverse
+          EOF
           sudo apt update
           sudo apt install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu gettext
           # Remove conflicting packages

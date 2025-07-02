@@ -100,12 +100,12 @@ make
 
 3. **Install the plugin:**
 ```bash
-make install
+sudo make install
 ```
 
 4. **Optional - Install icons:**
 ```bash
-make install-icons  # May fail if icons don't exist, this is normal
+sudo make install-icons  # May fail if icons don't exist, this is normal
 ```
 
 5. **Restart Pidgin** to load the new plugin.

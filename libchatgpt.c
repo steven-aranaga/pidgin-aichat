@@ -874,7 +874,7 @@ chatgpt_login(PurpleAccount *account)
 		
 		if (cga->provider_type == LLM_PROVIDER_OPENAI) {
 			purple_serv_got_im(pc, CHATGPT_INSTRUCTOR_ID, 
-				"Hello! I'm the ChatGPT plugin for Pidgin. To create a new assistant, send a message to me with the instructions for the assistant you want to create.", 
+				"Hello! I'm the AI Chat plugin for Pidgin. To create a new assistant, send a message to me with the instructions for the assistant you want to create.", 
 				PURPLE_MESSAGE_SYSTEM | PURPLE_MESSAGE_RECV, time(NULL));
 			chatgpt_fetch_assistants(cga);
 		} else {
@@ -1086,7 +1086,7 @@ chatgpt_protocol_init(PurpleProtocol *prpl_info)
 
 	//PurpleProtocol
 	info->id = CHATGPT_PLUGIN_ID;
-	info->name = "ChatGPT";
+	info->name = "AI Chat";
 	prpl_info->options = OPT_PROTO_NO_PASSWORD | OPT_PROTO_IM_IMAGE;
 
 #if !PURPLE_VERSION_CHECK(3, 0, 0)
@@ -1259,10 +1259,10 @@ chatgpt_protocol_roomlist_iface_init(PurpleProtocolRoomlistIface *prpl_info)
 	info->type = PURPLE_PLUGIN_PROTOCOL;
 	info->priority = PURPLE_PRIORITY_DEFAULT;
 	info->version = CHATGPT_PLUGIN_VERSION;
-	info->summary = N_("ChatGPT Protocol Plugin");
-	info->description = N_("ChatGPT Protocol Plugin");
-	info->author = "Eion Robb <eionrobb@gmail.com>";
-	info->homepage = "http://github.com/EionRobb/pidgin-chatgpt";
+	info->summary = N_("AI Chat Protocol Plugin");
+	info->description = N_("AI Chat Protocol Plugin");
+	info->author = "Steven Aranaga <steven.aranaga@gmail.com>";
+	info->homepage = "https://github.com/steven-aranaga/pidgin-aichat";
 	info->load = plugin_load;
 	info->unload = plugin_unload;
 	info->extra_info = prpl_info;
@@ -1337,12 +1337,12 @@ plugin_query(GError **error)
 {
 	return purple_plugin_info_new(
 		"id",           chatgpt_PLUGIN_ID,
-		"name",         "ChatGPT Protocol",
+		"name",         "AI Chat Protocol",
 		"version",      chatgpt_PLUGIN_VERSION,
 		"category",     N_("Protocol"),
-		"summary",      N_("ChatGPT Protocol Plugin"),
-		"description",  N_("ChatGPT Protocol Plugin"),
-		"website",      "http://github.com/EionRobb/pidgin-chatgpt",
+		"summary",      N_("AI Chat Protocol Plugin"),
+		"description",  N_("AI Chat Protocol Plugin"),
+		"website",      "https://github.com/steven-aranaga/pidgin-aichat",
 		"abi-version",  PURPLE_ABI_VERSION,
 		"flags",        PURPLE_PLUGIN_INFO_FLAGS_INTERNAL |
 		                PURPLE_PLUGIN_INFO_FLAGS_AUTO_LOAD,
@@ -1357,4 +1357,3 @@ PURPLE_PLUGIN_INIT(chatgpt, plugin_query, libpurple3_plugin_load, libpurple3_plu
 static PurplePluginInfo aLovelyBunchOfCoconuts;
 PURPLE_INIT_PLUGIN(chatgpt, plugin_init, aLovelyBunchOfCoconuts);
 #endif
-
