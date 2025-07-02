@@ -1,7 +1,7 @@
 # AI Chat plugin for Pidgin
 
 A Pidgin/libpurple plugin that lets you create and chat with AI bots from various Large Language Model (LLM) providers.
-Supports 13+ major LLM providers out of the box including OpenAI, Anthropic, Google Gemini, Mistral, and many more, plus local models via Ollama and custom endpoints.
+Supports 14 major LLM providers out of the box including OpenAI, Anthropic, Google Gemini, Mistral, and many more, plus local models via Ollama and custom endpoints.
 
 ## Credits
 
@@ -65,18 +65,54 @@ Custom adapters can be implemented for other formats.
 
 ## Installation
 
-### From Source
+### Prerequisites
+
+Install the required dependencies:
+
+**Ubuntu/Debian:**
 ```bash
-make
-make install
-make install-icons
+sudo apt update
+sudo apt install build-essential libpurple-dev libjson-glib-dev libglib2.0-dev zlib1g-dev pidgin pidgin-dev pkg-config
 ```
 
-### Dependencies
-- libpurple development headers
-- json-glib
-- glib2 development headers
-- C compiler (gcc/clang)
+**Fedora/RHEL/CentOS:**
+```bash
+sudo dnf install gcc make pkgconfig libpurple-devel json-glib-devel glib2-devel zlib-devel pidgin pidgin-devel
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S base-devel libpurple json-glib glib2 zlib pidgin pkg-config
+```
+
+### Build and Install
+
+1. **Clone the repository:**
+```bash
+git clone https://github.com/steven-aranaga/pidgin-aichat-clone.git
+cd pidgin-aichat-clone
+```
+
+2. **Build the plugin:**
+```bash
+make
+```
+
+3. **Install the plugin:**
+```bash
+make install
+```
+
+4. **Optional - Install icons:**
+```bash
+make install-icons  # May fail if icons don't exist, this is normal
+```
+
+5. **Restart Pidgin** to load the new plugin.
+
+### Verification
+
+After installation, you should see "AI Chat" as an available protocol when adding a new account in Pidgin.
 
 ## Configuration
 

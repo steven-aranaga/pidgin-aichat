@@ -61,6 +61,14 @@ static const char *provider_display_names[] = {
 
 /* Forward declarations for provider initialization functions */
 extern void llm_provider_openai_init(void);
+extern void llm_provider_anthropic_init(void);
+extern void llm_provider_google_init(void);
+extern void llm_provider_openai_compat_init(void);
+extern void llm_provider_openrouter_init(void);
+extern void llm_provider_huggingface_init(void);
+extern void llm_provider_cohere_init(void);
+extern void llm_provider_ollama_init(void);
+extern void llm_provider_custom_init(void);
 
 /* Initialize the provider system */
 void
@@ -70,9 +78,17 @@ llm_providers_init(void)
     llm_provider_registry_init();
     
     /* Register built-in providers */
-    /* For now, we'll just register OpenAI as an example */
-    /* Other providers will be implemented in Phase 2 */
     llm_provider_openai_init();
+    llm_provider_anthropic_init();
+    llm_provider_google_init();
+    llm_provider_openai_compat_init();  /* Registers Mistral, Fireworks, Together, xAI, Groq, DeepSeek */
+    
+    /* Register Phase 3 providers */
+    llm_provider_openrouter_init();
+    llm_provider_huggingface_init();
+    llm_provider_cohere_init();
+    llm_provider_ollama_init();
+    llm_provider_custom_init();
 }
 
 /* Cleanup the provider system */

@@ -76,7 +76,15 @@ C_FILES = \
 	markdown.c \
 	providers.c \
 	provider_registry.c \
-	providers/openai.c
+	providers/openai.c \
+	providers/anthropic.c \
+	providers/google.c \
+	providers/openai_compat.c \
+	providers/openrouter.c \
+	providers/huggingface.c \
+	providers/cohere.c \
+	providers/ollama.c \
+	providers/custom.c
 PURPLE_COMPAT_FILES := purple2compat/http.c purple2compat/purple-socket.c
 PURPLE_C_FILES := libchatgpt.c $(C_FILES)
 
@@ -133,4 +141,3 @@ FAILNOPURPLE:
 
 clean:
 	rm -f $(PLUGIN_TARGET)
-
