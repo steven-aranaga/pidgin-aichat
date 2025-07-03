@@ -16,7 +16,7 @@ jobs:
 
       - name: install deps
         run: |
-          # Add arm64 sources for Noble (24.04)
+          # Add arm64 sources for Noble (24.04) - remove invalid security repo
           sudo tee /etc/apt/sources.list.d/arm.list > /dev/null <<EOF
           deb [arch=arm64] http://ports.ubuntu.com/ noble main restricted
           deb [arch=arm64] http://ports.ubuntu.com/ noble-updates main restricted
@@ -25,7 +25,6 @@ jobs:
           deb [arch=arm64] http://ports.ubuntu.com/ noble multiverse
           deb [arch=arm64] http://ports.ubuntu.com/ noble-updates multiverse
           deb [arch=arm64] http://ports.ubuntu.com/ noble-backports main restricted universe multiverse
-          deb [arch=arm64] http://ports.ubuntu.com/ noble-security main restricted universe multiverse
           EOF
           sudo dpkg --add-architecture arm64
           sudo apt update
