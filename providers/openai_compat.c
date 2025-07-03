@@ -22,11 +22,11 @@
 #include <json-glib/json-glib.h>
 #include "../providers.h"
 #include "../provider_registry.h"
-#include "../libchatgpt.h"
+#include "../libaichat.h"
 
 /* Shared OpenAI-compatible request formatting */
 JsonObject*
-openai_compat_format_request(ChatGptBuddy *buddy, const char *message)
+openai_compat_format_request(AiChatBuddy *buddy, const char *message)
 {
     JsonObject *request;
     JsonArray *messages;
@@ -46,7 +46,7 @@ openai_compat_format_request(ChatGptBuddy *buddy, const char *message)
     
     /* Add conversation history */
     for (history = buddy->history; history != NULL; history = history->next) {
-        ChatGptHistory *hist = (ChatGptHistory *)history->data;
+        AiChatHistory *hist = (AiChatHistory *)history->data;
         msg = json_object_new();
         json_object_set_string_member(msg, "role", hist->role);
         json_object_set_string_member(msg, "content", hist->content);
@@ -131,14 +131,14 @@ openai_compat_validate_response(JsonObject *response, GError **error)
 
 /* Shared OpenAI-compatible URL building */
 char*
-openai_compat_get_chat_url(LLMProvider *provider, ChatGptBuddy *buddy)
+openai_compat_get_chat_url(LLMProvider *provider, AiChatBuddy *buddy)
 {
     return g_strdup_printf("%s%s", provider->endpoint_url, provider->chat_endpoint);
 }
 
 /* Shared OpenAI-compatible headers */
 GHashTable*
-openai_compat_get_additional_headers(ChatGptAccount *account, ChatGptBuddy *buddy)
+openai_compat_get_additional_headers(AiChatAccount *account, AiChatBuddy *buddy)
 {
     GHashTable *headers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
     const char *api_key = purple_account_get_string(account->account, "api_key", "");
@@ -177,7 +177,7 @@ openai_compat_parse_error(JsonObject *response)
 
 /* Generic auth header function for Bearer token */
 const char*
-openai_compat_get_auth_header(ChatGptAccount *account)
+openai_compat_get_auth_header(AiChatAccount *account)
 {
     static char auth_header[512];
     const char *api_key;

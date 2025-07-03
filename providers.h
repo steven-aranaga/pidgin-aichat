@@ -25,8 +25,8 @@
 #include <json-glib/json-glib.h>
 
 /* Forward declarations */
-typedef struct _ChatGptAccount ChatGptAccount;
-typedef struct _ChatGptBuddy ChatGptBuddy;
+typedef struct _AiChatAccount AiChatAccount;
+typedef struct _AiChatBuddy AiChatBuddy;
 
 /* Provider types enum */
 typedef enum {
@@ -80,22 +80,22 @@ typedef struct _LLMProvider {
     /* Function pointers for provider-specific implementations */
     
     /* Format a chat request for this provider */
-    JsonObject* (*format_request)(ChatGptBuddy *buddy, const char *message);
+    JsonObject* (*format_request)(AiChatBuddy *buddy, const char *message);
     
     /* Parse a response from this provider */
     char* (*parse_response)(JsonObject *response, GError **error);
     
     /* Get the authentication header for this provider */
-    const char* (*get_auth_header)(ChatGptAccount *account);
+    const char* (*get_auth_header)(AiChatAccount *account);
     
     /* Validate a response from this provider */
     gboolean (*validate_response)(JsonObject *response, GError **error);
     
     /* Get the full URL for a chat request */
-    char* (*get_chat_url)(struct _LLMProvider *provider, ChatGptBuddy *buddy);
+    char* (*get_chat_url)(struct _LLMProvider *provider, AiChatBuddy *buddy);
     
     /* Get additional headers if needed */
-    GHashTable* (*get_additional_headers)(ChatGptAccount *account, ChatGptBuddy *buddy);
+    GHashTable* (*get_additional_headers)(AiChatAccount *account, AiChatBuddy *buddy);
     
     /* Parse error response */
     char* (*parse_error)(JsonObject *response);

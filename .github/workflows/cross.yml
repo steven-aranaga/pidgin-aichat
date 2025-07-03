@@ -67,7 +67,7 @@ jobs:
           export WIN32_CC=i686-w64-mingw32-gcc
           export WIN32_DEV_TOP=win32-dev
           export PIDGIN_TREE_TOP=pidgin
-          make libchatgpt.dll
+          make libaichat.dll
 
       - name: archive
         if: ${{ !env.ACT }}

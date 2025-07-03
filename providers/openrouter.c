@@ -22,7 +22,7 @@
 #include <json-glib/json-glib.h>
 #include "../providers.h"
 #include "../provider_registry.h"
-#include "../libchatgpt.h"
+#include "../libaichat.h"
 
 /* OpenRouter popular models */
 static const char *openrouter_models[] = {
@@ -47,7 +47,7 @@ static const char *openrouter_models[] = {
 
 /* Format a chat request for OpenRouter (uses OpenAI format) */
 static JsonObject*
-openrouter_format_request(ChatGptBuddy *buddy, const char *message)
+openrouter_format_request(AiChatBuddy *buddy, const char *message)
 {
     JsonObject *request;
     JsonArray *messages;
@@ -67,7 +67,7 @@ openrouter_format_request(ChatGptBuddy *buddy, const char *message)
     
     /* Add conversation history */
     for (history = buddy->history; history != NULL; history = history->next) {
-        ChatGptHistory *hist = (ChatGptHistory *)history->data;
+        AiChatHistory *hist = (AiChatHistory *)history->data;
         msg = json_object_new();
         json_object_set_string_member(msg, "role", hist->role);
         json_object_set_string_member(msg, "content", hist->content);
@@ -131,7 +131,7 @@ openrouter_parse_response(JsonObject *response, GError **error)
 
 /* Get the authentication header for OpenRouter */
 static const char*
-openrouter_get_auth_header(ChatGptAccount *account)
+openrouter_get_auth_header(AiChatAccount *account)
 {
     static char auth_header[512];
     const char *api_key;
@@ -165,14 +165,14 @@ openrouter_validate_response(JsonObject *response, GError **error)
 
 /* Get the full URL for a chat request */
 static char*
-openrouter_get_chat_url(LLMProvider *provider, ChatGptBuddy *buddy)
+openrouter_get_chat_url(LLMProvider *provider, AiChatBuddy *buddy)
 {
     return g_strdup_printf("%s%s", provider->endpoint_url, provider->chat_endpoint);
 }
 
 /* Get additional headers for OpenRouter */
 static GHashTable*
-openrouter_get_additional_headers(ChatGptAccount *account, ChatGptBuddy *buddy)
+openrouter_get_additional_headers(AiChatAccount *account, AiChatBuddy *buddy)
 {
     GHashTable *headers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
     const char *api_key = purple_account_get_string(account->account, "api_key", "");
@@ -182,7 +182,7 @@ openrouter_get_additional_headers(ChatGptAccount *account, ChatGptBuddy *buddy)
     g_hash_table_insert(headers, g_strdup("Authorization"), auth_header);
     
     /* OpenRouter-specific headers */
-    g_hash_table_insert(headers, g_strdup("HTTP-Referer"), g_strdup("https://github.com/steven-aranaga/pidgin-aichat"));
+    g_hash_table_insert(headers, g_strdup("HTTP-Referer"), g_strdup("https://github.com/steven-aranaga/pidgin-aichat-clone"));
     g_hash_table_insert(headers, g_strdup("X-Title"), g_strdup("Pidgin AI Chat"));
     
     return headers;
@@ -262,3 +262,4 @@ llm_provider_openrouter_init(void)
 {
     llm_provider_registry_register(&openrouter_provider);
 }
+

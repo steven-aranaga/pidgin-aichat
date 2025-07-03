@@ -22,7 +22,7 @@
 #include <json-glib/json-glib.h>
 #include "../providers.h"
 #include "../provider_registry.h"
-#include "../libchatgpt.h"
+#include "../libaichat.h"
 
 /* Popular Ollama models (these would be discovered dynamically in a real implementation) */
 static const char *ollama_models[] = {
@@ -56,7 +56,7 @@ static const char *ollama_models[] = {
 
 /* Format a chat request for Ollama Chat API */
 static JsonObject*
-ollama_format_request(ChatGptBuddy *buddy, const char *message)
+ollama_format_request(AiChatBuddy *buddy, const char *message)
 {
     JsonObject *request;
     JsonArray *messages;
@@ -76,7 +76,7 @@ ollama_format_request(ChatGptBuddy *buddy, const char *message)
     
     /* Add conversation history */
     for (history = buddy->history; history != NULL; history = history->next) {
-        ChatGptHistory *hist = (ChatGptHistory *)history->data;
+        AiChatHistory *hist = (AiChatHistory *)history->data;
         msg = json_object_new();
         json_object_set_string_member(msg, "role", hist->role);
         json_object_set_string_member(msg, "content", hist->content);
@@ -141,7 +141,7 @@ ollama_parse_response(JsonObject *response, GError **error)
 
 /* Get the authentication header for Ollama (none needed for local) */
 static const char*
-ollama_get_auth_header(ChatGptAccount *account)
+ollama_get_auth_header(AiChatAccount *account)
 {
     return "";  /* Ollama doesn't require authentication for local instances */
 }
@@ -166,9 +166,9 @@ ollama_validate_response(JsonObject *response, GError **error)
 
 /* Get the full URL for a chat request */
 static char*
-ollama_get_chat_url(LLMProvider *provider, ChatGptBuddy *buddy)
+ollama_get_chat_url(LLMProvider *provider, AiChatBuddy *buddy)
 {
-    ChatGptAccount *account = purple_connection_get_protocol_data(purple_account_get_connection(buddy->buddy->account));
+    AiChatAccount *account = purple_connection_get_protocol_data(purple_account_get_connection(buddy->buddy->account));
     const char *custom_endpoint = purple_account_get_string(account->account, "ollama_endpoint", "");
     
     /* Use custom endpoint if specified, otherwise default */
@@ -181,7 +181,7 @@ ollama_get_chat_url(LLMProvider *provider, ChatGptBuddy *buddy)
 
 /* Get additional headers for Ollama */
 static GHashTable*
-ollama_get_additional_headers(ChatGptAccount *account, ChatGptBuddy *buddy)
+ollama_get_additional_headers(AiChatAccount *account, AiChatBuddy *buddy)
 {
     GHashTable *headers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
     

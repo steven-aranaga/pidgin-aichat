@@ -22,7 +22,7 @@
 #include <json-glib/json-glib.h>
 #include "../providers.h"
 #include "../provider_registry.h"
-#include "../libchatgpt.h"
+#include "../libaichat.h"
 
 /* Google Gemini models */
 static const char *google_models[] = {
@@ -35,7 +35,7 @@ static const char *google_models[] = {
 
 /* Format a chat request for Google GenerateContent API */
 static JsonObject*
-google_format_request(ChatGptBuddy *buddy, const char *message)
+google_format_request(AiChatBuddy *buddy, const char *message)
 {
     JsonObject *request;
     JsonArray *contents;
@@ -61,7 +61,7 @@ google_format_request(ChatGptBuddy *buddy, const char *message)
     
     /* Add conversation history */
     for (history = buddy->history; history != NULL; history = history->next) {
-        ChatGptHistory *hist = (ChatGptHistory *)history->data;
+        AiChatHistory *hist = (AiChatHistory *)history->data;
         
         content = json_object_new();
         parts = json_array_new();
@@ -177,7 +177,7 @@ google_parse_response(JsonObject *response, GError **error)
 
 /* Get the authentication header for Google (not used, API key goes in URL) */
 static const char*
-google_get_auth_header(ChatGptAccount *account)
+google_get_auth_header(AiChatAccount *account)
 {
     return "";  /* Google uses API key in URL parameter */
 }
@@ -206,9 +206,9 @@ google_validate_response(JsonObject *response, GError **error)
 
 /* Get the full URL for a chat request (includes API key) */
 static char*
-google_get_chat_url(LLMProvider *provider, ChatGptBuddy *buddy)
+google_get_chat_url(LLMProvider *provider, AiChatBuddy *buddy)
 {
-    ChatGptAccount *account = purple_connection_get_protocol_data(purple_account_get_connection(buddy->buddy->account));
+    AiChatAccount *account = purple_connection_get_protocol_data(purple_account_get_connection(buddy->buddy->account));
     const char *api_key = purple_account_get_string(account->account, "api_key", "");
     const char *model = buddy->model ? buddy->model : "gemini-1.5-pro";
     
@@ -218,7 +218,7 @@ google_get_chat_url(LLMProvider *provider, ChatGptBuddy *buddy)
 
 /* Get additional headers for Google */
 static GHashTable*
-google_get_additional_headers(ChatGptAccount *account, ChatGptBuddy *buddy)
+google_get_additional_headers(AiChatAccount *account, AiChatBuddy *buddy)
 {
     GHashTable *headers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
     

@@ -22,7 +22,7 @@
 #include <json-glib/json-glib.h>
 #include "../providers.h"
 #include "../provider_registry.h"
-#include "../libchatgpt.h"
+#include "../libaichat.h"
 
 /* Default models for custom provider (user can override) */
 static const char *custom_models[] = {
@@ -39,7 +39,7 @@ static const char *custom_models[] = {
 
 /* Format a chat request for Custom provider (assumes OpenAI format by default) */
 static JsonObject*
-custom_format_request(ChatGptBuddy *buddy, const char *message)
+custom_format_request(AiChatBuddy *buddy, const char *message)
 {
     JsonObject *request;
     JsonArray *messages;
@@ -59,7 +59,7 @@ custom_format_request(ChatGptBuddy *buddy, const char *message)
     
     /* Add conversation history */
     for (history = buddy->history; history != NULL; history = history->next) {
-        ChatGptHistory *hist = (ChatGptHistory *)history->data;
+        AiChatHistory *hist = (AiChatHistory *)history->data;
         msg = json_object_new();
         json_object_set_string_member(msg, "role", hist->role);
         json_object_set_string_member(msg, "content", hist->content);
@@ -139,7 +139,7 @@ custom_parse_response(JsonObject *response, GError **error)
 
 /* Get the authentication header for Custom provider */
 static const char*
-custom_get_auth_header(ChatGptAccount *account)
+custom_get_auth_header(AiChatAccount *account)
 {
     static char auth_header[512];
     const char *api_key;
@@ -192,9 +192,9 @@ custom_validate_response(JsonObject *response, GError **error)
 
 /* Get the full URL for a chat request */
 static char*
-custom_get_chat_url(LLMProvider *provider, ChatGptBuddy *buddy)
+custom_get_chat_url(LLMProvider *provider, AiChatBuddy *buddy)
 {
-    ChatGptAccount *account = purple_connection_get_protocol_data(purple_account_get_connection(buddy->buddy->account));
+    AiChatAccount *account = purple_connection_get_protocol_data(purple_account_get_connection(buddy->buddy->account));
     const char *custom_endpoint = purple_account_get_string(account->account, "custom_endpoint", "");
     const char *custom_path = purple_account_get_string(account->account, "custom_chat_path", "/v1/chat/completions");
     
@@ -208,7 +208,7 @@ custom_get_chat_url(LLMProvider *provider, ChatGptBuddy *buddy)
 
 /* Get additional headers for Custom provider */
 static GHashTable*
-custom_get_additional_headers(ChatGptAccount *account, ChatGptBuddy *buddy)
+custom_get_additional_headers(AiChatAccount *account, AiChatBuddy *buddy)
 {
     GHashTable *headers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
     const char *api_key = purple_account_get_string(account->account, "api_key", "");

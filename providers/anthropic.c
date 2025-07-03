@@ -22,7 +22,7 @@
 #include <json-glib/json-glib.h>
 #include "../providers.h"
 #include "../provider_registry.h"
-#include "../libchatgpt.h"
+#include "../libaichat.h"
 
 /* Anthropic Claude models */
 static const char *anthropic_models[] = {
@@ -36,7 +36,7 @@ static const char *anthropic_models[] = {
 
 /* Format a chat request for Anthropic Messages API */
 static JsonObject*
-anthropic_format_request(ChatGptBuddy *buddy, const char *message)
+anthropic_format_request(AiChatBuddy *buddy, const char *message)
 {
     JsonObject *request;
     JsonArray *messages;
@@ -48,7 +48,7 @@ anthropic_format_request(ChatGptBuddy *buddy, const char *message)
     
     /* Add conversation history */
     for (history = buddy->history; history != NULL; history = history->next) {
-        ChatGptHistory *hist = (ChatGptHistory *)history->data;
+        AiChatHistory *hist = (AiChatHistory *)history->data;
         msg = json_object_new();
         json_object_set_string_member(msg, "role", hist->role);
         json_object_set_string_member(msg, "content", hist->content);
@@ -122,7 +122,7 @@ anthropic_parse_response(JsonObject *response, GError **error)
 
 /* Get the authentication header for Anthropic */
 static const char*
-anthropic_get_auth_header(ChatGptAccount *account)
+anthropic_get_auth_header(AiChatAccount *account)
 {
     static char auth_header[512];
     const char *api_key;
@@ -156,14 +156,14 @@ anthropic_validate_response(JsonObject *response, GError **error)
 
 /* Get the full URL for a chat request */
 static char*
-anthropic_get_chat_url(LLMProvider *provider, ChatGptBuddy *buddy)
+anthropic_get_chat_url(LLMProvider *provider, AiChatBuddy *buddy)
 {
     return g_strdup_printf("%s%s", provider->endpoint_url, provider->chat_endpoint);
 }
 
 /* Get additional headers for Anthropic */
 static GHashTable*
-anthropic_get_additional_headers(ChatGptAccount *account, ChatGptBuddy *buddy)
+anthropic_get_additional_headers(AiChatAccount *account, AiChatBuddy *buddy)
 {
     GHashTable *headers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
     

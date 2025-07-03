@@ -22,7 +22,7 @@
 #include <json-glib/json-glib.h>
 #include "../providers.h"
 #include "../provider_registry.h"
-#include "../libchatgpt.h"
+#include "../libaichat.h"
 
 /* Cohere models */
 static const char *cohere_models[] = {
@@ -37,7 +37,7 @@ static const char *cohere_models[] = {
 
 /* Format a chat request for Cohere Chat API */
 static JsonObject*
-cohere_format_request(ChatGptBuddy *buddy, const char *message)
+cohere_format_request(AiChatBuddy *buddy, const char *message)
 {
     JsonObject *request;
     JsonArray *chat_history;
@@ -49,7 +49,7 @@ cohere_format_request(ChatGptBuddy *buddy, const char *message)
     
     /* Add conversation history in Cohere format */
     for (history = buddy->history; history != NULL; history = history->next) {
-        ChatGptHistory *hist = (ChatGptHistory *)history->data;
+        AiChatHistory *hist = (AiChatHistory *)history->data;
         chat_msg = json_object_new();
         
         /* Map roles: user -> USER, assistant -> CHATBOT */
@@ -104,7 +104,7 @@ cohere_parse_response(JsonObject *response, GError **error)
 
 /* Get the authentication header for Cohere */
 static const char*
-cohere_get_auth_header(ChatGptAccount *account)
+cohere_get_auth_header(AiChatAccount *account)
 {
     static char auth_header[512];
     const char *api_key;
@@ -135,14 +135,14 @@ cohere_validate_response(JsonObject *response, GError **error)
 
 /* Get the full URL for a chat request */
 static char*
-cohere_get_chat_url(LLMProvider *provider, ChatGptBuddy *buddy)
+cohere_get_chat_url(LLMProvider *provider, AiChatBuddy *buddy)
 {
     return g_strdup_printf("%s%s", provider->endpoint_url, provider->chat_endpoint);
 }
 
 /* Get additional headers for Cohere */
 static GHashTable*
-cohere_get_additional_headers(ChatGptAccount *account, ChatGptBuddy *buddy)
+cohere_get_additional_headers(AiChatAccount *account, AiChatBuddy *buddy)
 {
     GHashTable *headers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
     const char *api_key = purple_account_get_string(account->account, "api_key", "");
